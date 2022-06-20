@@ -48,6 +48,7 @@ else:
 r = sr.Recognizer()
 
 FORMAT_AUDIO = ''
+csv_file_content = []
 
 #se revisa la extensión de los archivos de audio
 list_extensions = os.listdir(PATH_FILES)
@@ -67,51 +68,39 @@ else:
         print('Los formatos aceptados son: {}'.format(ACCEPTED_FORMATS))
         sys.exit(0)
 
-sys.exit(0)
-for index, row in df.iterrows():
-    info_csv = []
-    print('=======')
-    text = ''
-    if FORMAT_AUDIO == 'mp3':
-        sound = AudioSegment.from_mp3("{}{}.mp3".format(PATH_FILES,row['Nombre']))
-        sound.export("{}{}.wav".format(PATH_FILES,row['Nombre']), format="wav")
-    if FORMAT_AUDIO == 'aif' or FORMAT_AUDIO == 'aiff':
-        sound = AudioSegment.from_file("{}{}.{}".format(PATH_FILES,row['Nombre'], FORMAT_AUDIO))
-        sound.export("{}{}.wav".format(PATH_FILES,row['Nombre']), format="wav")
-    path_audio = '{}{}.wav'.format(PATH_FILES,row['Nombre'])
-    info_csv.append(row['Nombre'])
-    print('Buscando el audio: {}'.format(path_audio))  
-    if(os.path.exists('{}'.format(path_audio))):
-        print('Analizando el audio...\n\n')
-        info_csv.append(row['Texto'])
-        try: 
-            with sr.AudioFile(path_audio) as source:
-                audio = r.record(source)
-                text = r.recognize_google(audio, language='es-MX')
-            info_csv.append(text)
-            texto_free = row['Texto'].replace(',','').replace('.','').replace(':','').replace('(','').replace(')','').replace('\n','').replace('“','').replace('“','').replace('–','').lower().strip()
-            concordancia = fuzz.ratio(texto_free, text.lower())
-            info_csv.append(concordancia)
-            print('La concordacia es del: {}%'.format(concordancia))
-            if concordancia <= 98:
-                generador_diferencia = difflib.ndiff(texto_free.splitlines(), text.lower().strip().splitlines())
-                difference = difflib.HtmlDiff(tabsize=2, wrapcolumn=50)
-                with open("{}diff {}.html".format(PATH_OUTPUT, row['Nombre']), "w") as fp:
-                    html = difference.make_file(fromlines=texto_free.splitlines(), tolines=text.lower().strip().splitlines(), fromdesc="Guión", todesc="Audio del locutor")
-                    fp.write(html)
-            song = AudioSegment.from_wav(path_audio)
-            song.export("{}{}.mp3".format(PATH_OUTPUT, row['Nombre']), format="mp3")
-        except Exception as e:
-            print('Error el cargar el audio: {}'.format(e))
-    else:
-        print('No existe el archivo')
-        info_csv.append('No existe el archivo!')
-    csv_file_content.append(info_csv)
-    print('=======')
+
+files = os.listdir(PATH_FILES)
+for file in files:
+    if file[0] != '.':
+        print(file)
+        info_csv = []
+        if FORMAT_AUDIO == 'mp3':
+            sound = AudioSegment.from_mp3("{}{}.mp3".format(PATH_FILES,file.split('.')[0]))
+            sound.export("{}{}.wav".format(PATH_FILES,file.split('.')[0]), format="wav")
+        if FORMAT_AUDIO == 'aif' or FORMAT_AUDIO == 'aiff':
+            sound = AudioSegment.from_file("{}{}.{}".format(PATH_FILES,file.split('.')[0], FORMAT_AUDIO))
+            sound.export("{}{}.wav".format(PATH_FILES,file.split('.')[0]), format="wav")
+        path_audio = '{}{}.wav'.format(PATH_FILES,file.split('.')[0])
+        info_csv.append(path_audio)
+        print('Buscando el audio: {}'.format(path_audio))  
+        if(os.path.exists('{}'.format(path_audio))):
+            print('Analizando el audio...\n\n')
+            try: 
+                with sr.AudioFile(path_audio) as source:
+                    audio = r.record(source)
+                    text = r.recognize_google(audio, language='es-MX')
+                info_csv.append(text)
+            except Exception as e:
+                print('Error el cargar el audio: {}'.format(e))
+        else:
+            print('No existe el archivo')
+            info_csv.append('No existe el archivo!')
+        csv_file_content.append(info_csv)
+        print('=======')
 
 with open('{}relacion.csv'.format(PATH_OUTPUT), mode='w') as csv_file:
     csv_writer = csv.writer(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-    csv_writer.writerow(['Audio','Guión', 'Audio del locutor', 'concordacia'])
+    csv_writer.writerow(['Audio','Texto'])
     for row in csv_file_content:
         csv_writer.writerow(row)
 
